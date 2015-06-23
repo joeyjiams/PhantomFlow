@@ -21,8 +21,8 @@ svg {
 
 .step 			circle { fill: #D6B838; }
 .active 		circle { fill: #808582; }
-.chanceRoot 	circle { fill: #DDD; }
-.decisionRoot 	circle { fill: #DDD; }
+.chanceRoot 	circle { display: none}
+.decisionRoot 	circle { display: none}
 .decision 		circle { fill: #DDD; }
 .chance 		circle { fill: #DDD; }
 .screenshot 	circle { fill: #49BF70; cursor: pointer; }

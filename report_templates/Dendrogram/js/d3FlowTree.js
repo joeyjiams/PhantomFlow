@@ -56,7 +56,7 @@ function createD3Tree(root, config){
 		.attr("transform", function(d) { return "translate(" + d.y + "," + d.x + ")"; });
 
 	svg.selectAll(".step").filter(function(d, i){
-		return !d.isDecision && !d.isChance && !d.name;
+		return  !d.name;
 	}).remove();
 
 	svg.selectAll(".step").filter(function(d, i){
@@ -126,11 +126,10 @@ function createD3Tree(root, config){
 			});
 		});
 
-	var dy = !!window.chrome ? 6 : 22;
-
+    // add the label next to the node
 	node.append("text")
-		.attr("dx", function(d,e, f) { return d.isBranchRoot ? 8 : d.children ? -15 : 15; })
-		.attr("dy", function(d) { return d.isBranchRoot ? 22 : d.children ? dy  : dy ; })
+		.attr("dx", function(d,e, f) { return d.isBranchRoot ? 15 : d.children ? -15 : 15; })
+		.attr("dy", 4)
 		.attr("class", function(d) { return d.isDecisionRoot ? 'text decisiontext' : d.isChanceRoot ? 'text chancetext' : d.children ? 'text steptext' : 'text endtext'; })
 		.attr("transform",  function(d) { return (d.children && !d.isBranchRoot) ? "rotate(330)" : "rotate(0)"; })
 		.text(function(d) { return d.name.replace('.json', ''); });

@@ -2,7 +2,7 @@
 
 	getDataAndAppendDropdown();
 
-	$.get('rebase')
+	$.get(window.location.origin+'/rebase')
 		.done(function(){
 			initialiseSideBar(true);
 		})
@@ -50,7 +50,7 @@
 
 		rebaseBtn.click(function(){
 			if(confirm("Are you sure you want to accept the latest image as the visual baseline for this test?")){
-				$.post('rebase', {
+				$.post(window.location.origin+'/rebase', {
 					'img': imageToRebase
 				}, function(){
 					rebaseBtn.hide();
@@ -157,7 +157,7 @@
 			value.name = key;
 		});
 
-		createD3ClusterDendrogram( $.extend(true, {}, combined), {
+        createD3Tree( $.extend(true, {}, combined), {
 			root: '/'
 		});
 	}

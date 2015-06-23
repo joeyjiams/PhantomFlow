@@ -43,7 +43,8 @@ body {
 }
 
 .navmenu {
-	width: 376px;
+	width: 700px;
+    max-width: 60%;
 	box-shadow: 4px 0px 84px 0px #999;
 }
 

@@ -19,6 +19,7 @@ var glob = require( "glob" );
 var cp = require( 'child_process' );
 var wrench = require( 'wrench' );
 var async = require( 'async' );
+var execSync = require('child_process').execSync;
 
 var optionDebug;
 
@@ -39,15 +40,15 @@ module.exports.init = function ( options ) {
 	var includes = path.resolve( options.includes || 'include' );
 	var tests = path.resolve( options.tests || 'test' ) + '/';
 	var results = path.resolve( options.results || 'test-results' );
-	var reports = path.resolve( options.reports || results + '/report/' );
 
 	var remoteDebug = options.remoteDebug || false;
 	var remoteDebugAutoStart = options.remoteDebugAutoStart || false;
 	var remoteDebugPort = options.remoteDebugPort || 9000;
 
 	var threads = options.threads || 4;
+	var maxRetry = typeof(options.retry) == "undefined" ? 3 : options.retry;
 
-	/*
+    /*
 		Set to false if you do not want the tests to return on the first failure
 	*/
 	var earlyExit = typeof options.earlyexit === 'undefined' ? false : options.earlyexit;
@@ -58,7 +59,8 @@ module.exports.init = function ( options ) {
 	var dontDoVisuals = options.skipVisualTests;
 	var hideElements = options.hideElements || [];
 	var casperArgs = options.casperArgs || [];
-
+	//var casperArgs = "--ssl-protocol=any --web-security=false  --ignore-ssl-errors=yes";
+	
 	var args = [];
 
 	var visualTestsPath = changeSlashes( tests + '/visuals/' );
@@ -66,9 +68,15 @@ module.exports.init = function ( options ) {
 	var dataPath = changeSlashes( results + '/data/' );
 	var xUnitPath = changeSlashes( results + '/xunit/' );
 	var debugPath = changeSlashes( results + '/debug/' );
-	var reportPath = changeSlashes( reports );
+	var reportPath = changeSlashes( results + '/report/' );
+	var visualResultsPath = changeSlashes(results + '/visuals/');
 
-	var visualResultsPath = changeSlashes( results + '/visuals/' );
+	var loggedErrors = [];
+	var failCount = 0;
+	var passCount = 0;
+	var isFinished = false;
+	var retry = 0;
+	var exitCode = 1;
 
 	optionDebug = parseInt( options.debug, 10 ) < 3 ? parseInt( options.debug, 10 ) : void 0;
 
@@ -90,13 +98,7 @@ module.exports.init = function ( options ) {
 		},
 		run: function ( done ) {
 
-			var loggedErrors = [];
-			var failCount = 0;
-			var passCount = 0;
-			var isFinished = false;
 			var files;
-
-			var exitCode = 1;
 
 			glob.sync(
 					visualResultsPath + '/**/*.fail.png, ' +
@@ -104,7 +106,7 @@ module.exports.init = function ( options ) {
 					dataPath + '/**/*.js' )
 				.forEach(
 					function ( file ) {
-						deleteFile( file ); // delete
+						deleteFile( file, true ); // delete
 					}
 				);
 
@@ -136,21 +138,6 @@ module.exports.init = function ( options ) {
 			if ( files.length === 0 ) {
 				eventEmitter.emit( 'exit' );
 			}
-
-			if ( files.length < threads ) {
-				threads = files.length;
-			}
-
-			if ( optionDebug > 0 || remoteDebug ) {
-				threads = 1;
-			}
-
-			/*
-				Group the files for thread parallelization
-			*/
-			fileGroups = _.groupBy( files, function ( val, index ) {
-				return index % threads;
-			} );
 
 			/*
 				Enable https://github.com/ariya/phantomjs/wiki/Troubleshooting#remote-debugging
@@ -190,168 +177,55 @@ module.exports.init = function ( options ) {
 			if ( hideElements ) {
 				args.push( '--hideelements=' + hideElements.join( ',' ) );
 			}
-
-			if ( casperArgs ) {
+			if (options.setting) {
+			    args.push('--setting=' + options.setting);
+			}
+            if (casperArgs) {
 				args = args.concat( casperArgs );
 			}
 
-			if ( filterTests ) {
-				deleteFolderRecursive( reportPath );
-				_.forEach( files, function( file ){
-					deleteFolderRecursive( dataPath + file );
-					deleteFolderRecursive( debugPath + file );
-					deleteFolderRecursive( visualResultsPath + file );
-				});
-			}
-			else {
-				deleteFolderRecursive ( results );
-			}
+			cleanupFolderRecursive(results, true);
+			deleteFile('failedtests.json', true);
+		    testFiles(files);
 
-			console.log( 'Parallelising ' + files.length + ' test files on ' + threads + ' threads.\n' );
+		    eventEmitter.on('retry', function() {
+		        console.log("Retry run #" + (++retry));
+		        cleanupFolderRecursive(results, false);
+		        var failedTestcases = [];
+		        if (loggedErrors.length > 0) {
+		            var failedTests = [];
+		            loggedErrors.forEach(function (error) {
+		                failedTests.push(error.file);
+		                var testname = error.testId;
+		                if (testname) {
+		                    failedTestcases.push(testname);
+		                }
+		            });
+		            fs.writeFileSync('failedtests.json', JSON.stringify(failedTestcases));
+		            loggedErrors = [];
+		            glob.sync(visualResultsPath + '/**/*.fail.png')
+                        .forEach(
+                            function (file) {
+                                deleteFile(file, true); // delete
+                            }
+                        );
+		            testFiles(failedTests.unique());
+		        } 
+		    });
 
-			_.forEach( fileGroups, function ( files, index ) {
-
-				var groupArgs = args.slice( 0 );
-				var child;
-				var currentTestFile = '';
-				var stdoutStr = '';
-				var failFileName = 'error_' + index + '.log';
-				var hasErrored = false;
-
-				groupArgs.push( '--flowtests=' + changeSlashes( files.join( ',' ) ) );
-
-				child = cp.spawn(
-					changeSlashes( casperPath ),
-					groupArgs, {
-						stdio: false
-					}
-				);
-
-				child.on( 'close', function ( code ) {
-
-					var mergedData;
-
-					if ( code !== 0 ) {
-
-						console.log( ( 'It broke, sorry. Threads aborted. Non-zero code (' + code + ') returned.' ).red );
-						writeLog( results, failFileName, stdoutStr );
-						if ( earlyExit ) {
-							eventEmitter.emit( 'exit' );
-						}
-					}
-
-					threadCompletionCount += 1;
-
-					if ( threadCompletionCount === threads ) {
-						console.log( '\n All the threads have completed. \n'.grey );
-
-						loggedErrors.forEach( function ( error ) {
-							console.log( ( '== ' + error.file ).white );
-							console.log( error.msg.bold.red );
-						} );
-
-						console.log(
-							( 'Completed ' + ( failCount + passCount ) + ' tests in ' + Math.round( ( Date.now() - time ) / 1000 ) + ' seconds. ' ) +
-							( failCount + ' failed, ' ).bold.red +
-							( passCount + ' passed. ' ).bold.green );
-
-						if ( failCount === 0 ) {
-							exitCode = 0;
-						}
-
-						if ( createReport ) {
-
-							mergedData = concatData( dataPath, visualTestsPath, visualResultsPath );
-
-							copyReportTemplate(
-								mergedData,
-								reportPath,
-								createReport
-							);
-						}
-
-						eventEmitter.emit( 'exit' );
-					} else {
-						console.log( '\n A thread has completed. \n'.yellow );
-					}
-				} );
-
-				child.stdout.on( 'data', function ( buf ) {
-
-					var bufstr = String( buf );
-
-					if ( /^execvp\(\)/.test( buf ) ) {
-						console.log( 'Failed to start CasperJS' );
-					}
-
-					if ( /Error:/.test( bufstr ) ) {
-						hasErrored = true;
-					}
-
-					bufstr.split( /\n/g ).forEach( function ( line ) {
-
-						if ( /TESTFILE/.test( line ) ) {
-							currentTestFile = line.replace( 'TESTFILE ', '' );
-						}
-
-						if ( /FAIL|\[PhantomCSS\] Screenshot capture failed/.test( line ) ) {
-							console.log( line.bold.red );
-
-							loggedErrors.push( {
-								file: currentTestFile,
-								msg: line
-							} );
-
-							failCount++;
-
-							if ( earlyExit === true ) {
-								writeLog( results, failFileName, stdoutStr );
-								eventEmitter.emit( 'exit' );
-
-								child.kill();
-							}
-
-						} else if ( /PASS/.test( line ) ) {
-							passCount++;
-							console.log( line.green );
-						} else if ( /DEBUG/.test( line ) ) {
-							console.log( ( '\n' + line.replace( /DEBUG/, '' ) + '\n' ).yellow );
-						} else if ( hasErrored ) {
-							console.log( line.bold.red );
-							if ( earlyExit === true ) {
-								writeLog( results, failFileName, stdoutStr );
-								eventEmitter.emit( 'exit' );
-
-								child.kill();
-							}
-						} else if ( threads === 1 && optionDebug > 0 ) {
-							console.log( line.white );
-						}
-
-						stdoutStr += line;
-					} );
-				} );
-
-				if ( remoteDebug ) {
-					console.log( "Remote debugging is enabled.  Web Inspector interface will show shortly.".bold.green );
-					console.log( "Please use ctrl+c to escape\n".bold.green );
-					console.log( "https://github.com/ariya/phantomjs/wiki/Troubleshooting#remote-debugging\n".underline.bold.grey );
-
-					if ( !remoteDebugAutoStart ) {
-						console.log( "Click 'about:blank' to see the PhantomJS Inspector." );
-						console.log( "To start, enter the '__run()' command in the Web Inspector Console.\n" );
-					}
-
-					setTimeout( function () {
-						//console.log(("If Safari or Chrome is not your default browser, please open http://localhost:"+remoteDebugPort+" in a compatible browser.\n").bold.yellow);
-						open( 'http://localhost:' + remoteDebugPort, "chrome" );
-					}, 3000 );
-				}
-			} );
-
-			eventEmitter.on( 'exit', function () {
+		    eventEmitter.on('exit', function () {
 				isFinished = true;
-			} );
+			});
+
+			eventEmitter.on('report', function () {
+			    mergedData = concatData(dataPath, visualTestsPath, visualResultsPath);
+
+			    copyReportTemplate(
+                    mergedData,
+                    reportPath,
+                    createReport
+                );
+			});
 
 			async.until(
 				function () {
@@ -362,13 +236,185 @@ module.exports.init = function ( options ) {
 				},
 				function () {
 					if ( done ) {
-						done( exitCode, { passCount: passCount, failCount: failCount, loggedErrors: loggedErrors });
+						done( exitCode );
 					}
 				}
 			);
 
 		}
 	};
+
+	function testFiles(files) {
+	    /*
+        Group the files for thread parallelization
+        */
+
+	    if (files.length < threads) {
+	        threads = files.length;
+	    }
+
+	    if (optionDebug > 0 || remoteDebug) {
+	        threads = 1;
+	    }
+
+	    threadCompletionCount = 0;
+
+	    fileGroups = _.groupBy(files, function (val, index) {
+	        return index % threads;
+	    });
+
+	    console.log('Parallelising ' + files.length + ' test files on ' + threads + ' threads.\n');
+	    console.log("Testing suites:\n" + files);
+	    _.forEach(fileGroups, function (files, index) {
+
+	        var groupArgs = args.slice(0);
+	        var child;
+	        var currentTestFile = '';
+	        var stdoutStr = '';
+	        var failFileName = 'error_' + index + '.log';
+	        var hasErrored = false;
+
+	        groupArgs.push('--flowtests=' + changeSlashes(files.join(',')));
+	        //console.log("starting test:" + casperPath + groupArgs);
+	        child = cp.spawn(
+                changeSlashes(casperPath),
+                groupArgs, {
+                    stdio: false
+                }
+            );
+
+	        child.on('close', function (code) {
+
+	            var mergedData;
+
+	            if (code !== 0) {
+
+	                console.log(('It broke, sorry. Threads aborted. Non-zero code (' + code + ') returned.').red);
+	                writeLog(results, failFileName, stdoutStr);
+	                if (earlyExit) {
+	                    eventEmitter.emit('exit');
+	                }
+	            }
+
+	            threadCompletionCount += 1;
+
+	            if (threadCompletionCount === threads) {
+	                console.log('\n All the threads have completed. \n'.grey);
+
+	                loggedErrors.forEach(function (error) {
+	                    console.log(('== ' + error.file).white);
+	                    console.log(error.msg.bold.red);
+	                });
+
+	                console.log(
+                        ('Completed ' + (failCount + passCount) + ' tests in ' + Math.round((Date.now() - time) / 1000) + ' seconds. ') +
+                        (failCount + ' failed, ').bold.red +
+                        (passCount + ' passed. ').bold.green);
+
+	                if (failCount > 0 && retry < maxRetry) {
+	                    console.log((failCount + " tests failed, retry the failed test suite.").bold.red);
+	                    failCount = passCount = 0;
+	                    eventEmitter.emit('retry'); 
+	                } else {
+	                    if (failCount === 0) {
+	                        exitCode = 0;
+	                    }
+	                    if (createReport) {
+	                        eventEmitter.emit('report');
+	                    }
+
+	                    eventEmitter.emit('exit');
+                    }
+
+	            } else {
+	                console.log('\n A thread has completed. \n'.yellow);
+	            }
+	        });
+
+	        child.stdout.on('data', function (buf) {
+
+	            var bufstr = String(buf);
+
+	            if (/^execvp\(\)/.test(buf)) {
+	                console.log('Failed to start CasperJS');
+	            }
+
+	            if (/Error:/.test(bufstr)) {
+	                hasErrored = true;
+	            }
+
+	            bufstr.split(/\n/g).forEach(function (line) {
+
+	                if (/TESTFILE/.test(line)) {
+	                    currentTestFile = line.replace('TESTFILE ', '');
+	                }
+	                if (/FAIL PhantomCSS|CaptureFailed/.test(line)) {
+	                    console.log(line.bold.red);
+	                    var testFile = line.match(/visuals\/(.*\.js)/);
+	                    if (testFile && testFile.length === 2) {
+	                        currentTestFile = testFile[1];
+	                    }
+	                    var testId = /CaptureFailed/.test(line) ? line.replace('CaptureFailed: ', '') : line.replace('FAIL PhantomCSS ', '');
+	                    loggedErrors.push({
+	                        file: currentTestFile,
+	                        msg: line,
+	                        testId: testId
+	                    });
+	                    failCount++;
+
+	                    if (earlyExit === true) {
+	                        writeLog(results, failFileName, stdoutStr);
+	                        eventEmitter.emit('exit');
+
+	                        child.kill();
+	                    }
+
+	                } else if (/PASS/.test(line)) {
+	                    passCount++;
+	                    console.log(line.green);
+	                } else if (/DEBUG/.test(line)) {
+	                    console.log(('\n' + line.replace(/DEBUG/, '') + '\n').yellow);
+	                } else if (hasErrored) {
+	                    console.log(line.bold.red);
+	                    if (earlyExit === true) {
+	                        writeLog(results, failFileName, stdoutStr);
+	                        eventEmitter.emit('exit');
+
+	                        child.kill();
+	                    }
+	                } else if (threads === 1) {
+	                    console.log(line.white);
+	                }
+
+	                stdoutStr += line;
+	            });
+	        });
+
+	        if (remoteDebug) {
+	            console.log("Remote debugging is enabled.  Web Inspector interface will show shortly.".bold.green);
+	            console.log("Please use ctrl+c to escape\n".bold.green);
+	            console.log("https://github.com/ariya/phantomjs/wiki/Troubleshooting#remote-debugging\n".underline.bold.grey);
+
+	            if (!remoteDebugAutoStart) {
+	                console.log("Click 'about:blank' to see the PhantomJS Inspector.");
+	                console.log("To start, enter the '__run()' command in the Web Inspector Console.\n");
+	            }
+
+	            setTimeout(function () {
+	                //console.log(("If Safari or Chrome is not your default browser, please open http://localhost:"+remoteDebugPort+" in a compatible browser.\n").bold.yellow);
+	                open('http://localhost:' + remoteDebugPort, "chrome");
+	            }, 3000);
+	        }
+	    });
+	}
+};
+
+Array.prototype.unique = function() {
+    var a = [], k = 0, e;
+    for (k = 0; e = this[k]; k++)
+        if (a.indexOf(e) == -1)
+            a.push(e);
+    return a;
 };
 
 function concatData( dataPath, imagePath, imageResultPath ) {
@@ -416,6 +462,65 @@ function copyReportTemplate( data, dir, templateName ) {
 		}
 		fs.writeFileSync( datafilename, data );
 	}
+
+    writeStaticTestReport(dir, JSON.parse(data));
+}
+
+function writeStaticTestReport(dir, data) {
+    var filename = path.join(dir, 'TestResult.html');
+    var header = '<title>UI Regression test report</title>';
+    var failedTest = { val: '', failureCount: 0 };
+    var body = '';
+    pickOutFailedTests(data, 'Test', failedTest);
+    if (failedTest.failureCount > 0) {
+        body = '<h1 class="failed"> ' + failedTest.failureCount + ' failed tests: </h1> Click <a href="https://microsoft.sharepoint.com/teams/osg_unistore/sf/_layouts/OneNote.aspx?id=%2fteams%2fosg_unistore%2fsf%2fWeb%20SFW%2fOneStore.com%2fNotebooks%2fOne%20Store%20Website%20Planning&wd=target%28Technical%20Design%20and%20Guidance%2fTest.one%7c385A1DEE-D675-41B1-BD1A-389A6BE63933%2fUI%20Regression%20Test%7cB456262A-5E23-4E2A-8954-027D29219BB2%2f%29" target="_new"> here</a> for instruction.' + failedTest.val;
+    } else {
+        body = '<h1 class="passed">All test passed.</h1>';
+    }
+    var style = '<style>body{font-family: wf_segoe-ui_normal,Segoe,Tahoma,Verdana,Arial,sans-serif;} h2 {font-size: 1em;}.failed {color:red;} .passed {color:green;} h3 {color:gray} .latest, .diff{border: 1px dashed lightcoral;} .origin{border: 1px dashed lightgreen;} .owner,.testurl{color:darkcyan;} h2 span{margin-right: 1em;}</style>';
+    var html = '<!DOCTYPE html>'
+        + '<html><header>' + header + style + body + '</body></html>';
+    fs.writeFileSync(filename, html);
+}
+
+function pickOutFailedTests(data, name, output) {
+    if (typeof data == 'object' && data) {
+        var testname = '';
+        if (data.hasOwnProperty('name')) {
+            testname = name + ' > ' + data.name;
+        } else {
+            for (var child in data) {
+                pickOutFailedTests(data[child], Array.isArray(data) ? name : child, output);
+            }
+        }
+
+        if (data.hasOwnProperty('screenshot')) {
+            var screenshot = data.screenshot;
+            if (screenshot) {
+                if (screenshot.hasOwnProperty('failure')) {
+                    output.val += '<li> <h2>' + testname + '</h2><h2>'
+                        + '<span class="owner">Owner: ' + data.owner + '</span>'
+                        + '<span class="testurl">Test Url: <a href="' + data.testUrl + '">' + data.testUrl + '</a></span></h2>'
+                        + '<h3>Baseline</h3>' 
+                        + '<img class="origin" src="' + screenshot.original + '" />'
+                        + '<h3>Latest</h3>'
+                        + '<img class="latest" src="' + screenshot.latest + '" />'
+                        + '<h3>Diff</h3>'
+                        + '<img class="diff" src="' + screenshot.failure + '" /></li>';
+                    output.failureCount++;
+                }
+            } else {
+                output.val += '<li> <h2>' + testname + '</h2><h2>'
+                        + '<span class="owner">Owner: ' + data.owner + '</span>'
+                        + '<span class="testurl">Test Url: <a href="' + data.testUrl + '">' + data.testUrl + '</a></span></h2>'
+                        + 'Failed to capture screenshot. Dead link? Bad selector? </li>';
+                output.failureCount++;
+            }
+        }
+        if (data.hasOwnProperty('children') && data.children) {
+            pickOutFailedTests(data.children, testname, output);
+        }
+    }
 }
 
 function getImageResultDiffFromSrc( src ) {
@@ -486,12 +591,19 @@ function reqHandler( paths ) {
 				var resImage;
 
 				if ( image ) {
-					origImage = changeSlashes( paths.src + image );
-					resImage = changeSlashes( paths.res + getImageResultDiffFromSrc( image ) );
+				    origImage = changeSlashes( paths.src + image );
+				    resImage = changeSlashes( paths.res + getImageResultDiffFromSrc( image ) );
 
-					if ( isFile( origImage ) && isFile( resImage ) ) {
-						console.log( ( 'Rebasing... ' + origImage ).bold.yellow );
-						deleteFile( origImage );
+				    if ( isFile( origImage ) && isFile( resImage ) ) {
+				        console.log(('Rebasing... ' + origImage).bold.yellow);
+					    console.log(("tf checkout \"" + origImage + "\"").bold.yellow);
+						try {
+							execSync("tf checkout \"" + origImage + "\"", { timeout: 5000 });
+						}
+						catch (e) {
+							console.log("Not able to check out file. ")
+						}
+					    deleteFile(origImage);
 						moveFile( resImage, origImage );
 					}
 				}
@@ -507,7 +619,7 @@ function reqHandler( paths ) {
 				'Content-Type': 'text/plain',
 				'Content-Length': 0
 			} );
-			console.log( ( 'UI can make POST for image rebase' ).bold.yellow );
+			console.log( ( 'Click the rebase button to update screenshot baseline' ).bold.yellow );
 			res.end();
 		} else {
 			next();
@@ -541,7 +653,7 @@ function writeLogFile( path, log ) {
 	} );
 }
 
-function deleteFolderRecursive( path ) {
+function cleanupFolderRecursive(path, isDelete) {
 	var files = [];
 
 	if ( isDir( path ) ) {
@@ -549,16 +661,18 @@ function deleteFolderRecursive( path ) {
 		files.forEach( function ( file, index ) {
 			var curPath = path + "/" + file;
 			if ( isDir( curPath ) ) {
-				deleteFolderRecursive( curPath );
+			    cleanupFolderRecursive(curPath, isDelete);
 			} else {
-				deleteFile( curPath );
+			    deleteFile(curPath, isDelete);
 			}
 		} );
-		try {
-			fs.rmdirSync( path );
-		} catch ( e ) {
-			console.log( ( 'Could not remove ' + path + ' is there a file lock?' ).bold.red );
-		}
+	    if (isDelete) {
+	        try {
+	            fs.rmdirSync(path);
+	        } catch (e) {
+	            console.log(('Could not remove ' + path + ' is there a file lock?').bold.red);
+	        }
+	    }
 	}
 }
 
@@ -582,8 +696,13 @@ function readJSON( file ) {
 	return JSON.parse( fs.readFileSync( file ) );
 }
 
-function deleteFile( file ) {
-	fs.unlinkSync( file );
+function deleteFile(file, isDelete) {
+    if (fs.existsSync(file)) {
+        fs.chmodSync(file, 0777);
+        if (isDelete) {
+            fs.unlinkSync(file);
+        }
+    }
 }
 
 function getCasperPath() {
