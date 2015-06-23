@@ -1,72 +1,46 @@
 {
-  "name": "phantomflow",
-  "version": "0.4.3",
-  "description": "UI testing with PhantomCSS and Decision Trees",
+  "name": "joeyjiams-phantomflow",
+  "version": "0.0.1",
+  "description": "Compare new captured screenshots with the baselines, and point out the change in a web based UI report. And allow users to rebase the baseline by clicking buttons on the UI.",
   "main": "phantomflow.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "bl": "^0.9.4",
+    "colors": "^0.6.2",
+    "brace-expansion": "^1.1.0",
+    "datauri": "^0.5.5",
+    "inflight": "^1.0.4",
+    "connect": "^2.14.5",
+    "async": "^0.8.0",
+    "delayed-stream": "^0.0.5",
+    "once": "^1.3.2",
+    "glob": "^3.2.11",
+    "inherits": "^2.0.1",
+    "lodash": "^2.4.2",
+    "open": "^0.0.4",
+    "phantomcss": "^0.10.1",
+    "wrench": "^1.5.8"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "node test.js"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Huddle/PhantomFlow.git"
+    "url": "git+https://github.com/joeyjiams/PhantomFlow.git"
   },
   "keywords": [
-    "decision",
-    "casperjs",
+    "ui regression test",
+	"casperjs",
     "phantomjs",
-    "ui",
-    "testing",
-    "frontend",
-    "tdd",
-    "bdd",
     "phantomcss"
   ],
-  "author": {
-    "name": "James Cryer"
-  },
+  "author": "Joey Jia",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/Huddle/PhantomFlow/issues"
+    "url": "https://github.com/joeyjiams/PhantomFlow/issues"
   },
-  "homepage": "https://github.com/Huddle/PhantomFlow",
-  "dependencies": {
-    "glob": "~3.2.9",
-    "wrench": "~1.5.8",
-    "datauri": "~0.5.5",
-    "open": "0.0.4",
-    "connect": "~2.14.4",
-    "colors": "~0.6.2",
-    "lodash": "~2.4.1",
-    "phantomcss": "~0.10.0",
-    "async": "~0.8.0"
-  },
-  "devDependencies": {
-    "brace-expansion": "^1.1.0",
-    "delayed-stream": "0.0.5",
-    "inflight": "1.0.4",
-    "inherits": "2.0.1",
-    "once": "1.3.2",
-    "bl": "0.9.4"
-  },
-  "gitHead": "42f9e5cbb0af2b762eca0844764ce09e1256a470",
-  "_id": "phantomflow@0.4.3",
-  "scripts": {},
-  "_shasum": "5652304db0b3104f870d89452e282ebe0749ade4",
-  "_from": "phantomflow@*",
-  "_npmVersion": "2.1.10",
-  "_nodeVersion": "0.10.33",
-  "_npmUser": {
-    "name": "jamescryer",
-    "email": "james.cryer@huddle.com"
-  },
-  "maintainers": [
-    {
-      "name": "jamescryer",
-      "email": "james.cryer@huddle.com"
-    }
-  ],
-  "dist": {
-    "shasum": "5652304db0b3104f870d89452e282ebe0749ade4",
-    "tarball": "http://registry.npmjs.org/phantomflow/-/phantomflow-0.4.3.tgz"
-  },
-  "directories": {},
-  "_resolved": "https://registry.npmjs.org/phantomflow/-/phantomflow-0.4.3.tgz",
-  "readme": "ERROR: No README data found!"
+  "homepage": "https://github.com/joeyjiams/PhantomFlow#readme"
 }

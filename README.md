@@ -1,13 +1,9 @@
 PhantomFlow
 ===========
 
-**UI testing with decision trees**. An experimental approach to UI testing, based on [Decision Trees](http://en.wikipedia.org/wiki/Decision_tree). A NodeJS wrapper for [PhantomJS](http://github.com/ariya/phantomjs/), [CasperJS](http://github.com/n1k0/casperjs) and [PhantomCSS](http://github.com/Huddle/PhantomCSS), PhantomFlow enables a fluent way of describing user flows in code whilst generating [structured tree data](http://github.com/Huddle/PhantomFlow/tree/master/test-results/data/flows/coffeemachine.test.js/Get a coffee.json) for visualisation.
+**UI Regression test framework**. A NodeJS wrapper for [PhantomJS](http://github.com/ariya/phantomjs/), [CasperJS](http://github.com/n1k0/casperjs) and [PhantomCSS](http://github.com/Huddle/PhantomCSS). PhantomFlow compares newly captured screenshots with the baselines, and point out the change in a web based UI report. And it allows users to rebase the baseline by clicking buttons on the UI..
 
-![PhantomFlow Report: Test suite overview with radial Dendrogram and pie visualisation](https://raw.githubusercontent.com/Huddle/PhantomFlow/master/huddle-vis.png)
-
-The above visualisation is a real-world example, showing the complexity of visual testing at Huddle.
-
-### Aims
+### Features
 
 * Enable a more expressive way of describing user interaction paths within tests
 * Fluently communicate UI complexity to stakeholders and team members through generated visualisations
@@ -15,15 +11,17 @@ The above visualisation is a real-world example, showing the complexity of visua
 * Provide a fast feedback loop for UI testing
 * Raise profile of visual regression testing
 * Support misual regression workflows, quick inspection & rebasing via UI.
+* Retry failed tests to avoid random failure caused by render engine and external unreliables
+* Allow user to load a setting file and use the setting in tests for endpoint, account, etc.
+* Flatten node module dependencies to address long path issue in Windows
+* Create a static test report in plain HTML
+* Checkout file while rebasing (support TFS only for now)
+* Support https by default
+* Set up scaffold for writing static tests with simple JSON object
 
 ### Install
 
-* Install with git `git clone https://github.com/Huddle/PhantomFlow.git` `cd phantomflow` `npm install`
-* As a NodeJS dependency `npm install phantomflow`
-
-### See also
-
-PhantomFlow also comes as grunt plugin! [grunt-phantomflow](http://github.com/Huddle/grunt-phantomflow)
+* Install with git `git clone https://github.com/Joeyjiams/PhantomFlow.git` `cd phantomflow` `npm install`
 
 ### Try it!
 
@@ -31,112 +29,75 @@ PhantomFlow also comes as grunt plugin! [grunt-phantomflow](http://github.com/Hu
 * `node test/test.js` - Second run will compare baseline visuals with the latest screenshots. This'll pass because there have been no changes.
 * `node test/test.js report` - An optional step to load the Decision tree visualisation into your Web browser
 
-Mac OSX users should be aware that PhantomJS doesn't load the FontAwesome glyths used in the test suite, I don't understand why.  I fixed this locally by downloading FontAwesome and double clicking on the .otf file to install the font.
+There is an example test suites in test folder. You can add yours there too and they got run in parallel.
 
-There are two example test suites, these suites will be executed in parallel, the command line output is a bit muddled as a result.
-
-The D3.js visualisation opens with a combined view which merges the test decision trees. Click on a branch label or use the dropdown to show a specific test. Hover over the nodes to see the PhantomCSS screenshots. If there is a visual test failure the node will glow red, hover and click the node to show the original, latest and generated diff screenshots.
+The D3.js visualisation opens with a combined view which merges the test result trees. Click on a branch label or use the dropdown to show a specific test. Hover over the nodes to see the PhantomCSS screenshots. If there is a visual test failure the node will glow red, hover and click the node to show the original, latest and generated diff screenshots.
 
 ### Test Example
 
-The [demo](http://github.com/Huddle/PhantomFlow/tree/master/test/flows/coffeemachine.test.js) describes a fictional Coffee machine application.
+The [demo](http://github.com/joeyjiams/PhantomFlow/tree/master/test/example.test.js) has a static test (watch certain element on a page without any user interactive on it) and an interactive test.
 
 ```javascript
 
-flow("Get a coffee", function(){
-	step("Go to the kitchen", goToKitchen);
-	step("Go to the coffee machine", goToMachine);
-	decision({
-		"Wants Latte": function(){
-			chance({
-				"There is no milk": function(){
-					step("Request Latte", requestLatte_fail);
-					decision({
-						"Give up": function(){
-							step("Walk away from the coffee machine", walkAway);
-						},
-						"Wants Espresso instead": wantsEspresso
-					});
-				},
-				"There is milk": function(){
-					step("Request Latte", requestLatte_success);
-				}
-			});
-		},
-		"Wants Cappuccino": function(){
-			chance({
-				"There is no milk": function(){
-					step("Request Cappuccino", requestCappuccino_fail);
-					decision({
-						"Request Espresso instead": wantsEspresso
-					});
-				},
-				"There is milk": function(){
-					step("Request Cappuccino", requestCappuccino_success);
-				}
-			});
-		},
-		"Wants Espresso": wantsEspresso
-	});
-});
+    var staticTests = [
+        {
+            name: "shellheadertop",
+            owner: "foo",
+            url: setting.msEndpoint + "en-us/store/apps",
+            selector: ".shell-header-top",
+			hideSelector: "#meControl",
+            browserWidths: [1280, 520]
+        },
+        /*{
+            name: "test1",
+            owner: "bar",
+            url: "https://test.target.com/",
+            selector: ".some-css-selector", //optional
+			hideSelector: ".hide-some-element", // optional
+            browserWidths: [1600, 920]  //optional, set to 1280 by default
+        },*/
+    ];
+
+	flow('Test_Suite_Name', function() {
+        chance({
+            'static_tests': function() { runStaticTests(staticTests); }, // register all static tests
+            'interactive_tests': function() {
+                chance({
+                    'case1': function() { step('testMenu', testMenu, 'foo') }, // register interactive tests
+                    //'case2': function () { step('testX', testX, 'bar') },
+                });
+            }
+        });
+    });
+	
+	function testMenu() {
+        casper.thenOpen(setting.msEndpoint + 'en-us/store/apps', function () {  //setting object comes from testSetting.json
+            phantomCSS.turnOffAnimations();
+            casper.viewport(1280, 768);
+            casper.waitFor(function() {
+                return document.readyState == 'complete';
+            }, function() {
+                casper.click('a[role="menu"][data-bi-slot="5"]');
+                casper.waitForSelector('.active>.shell-header-dropdown-content',
+                    function success() {
+                        phantomCSS.screenshot('.active>.shell-header-dropdown-content', 'menu-dropdown');
+                        console.log('Should see dropdown menu');
+                    }
+                );
+            });
+        });
+    }
 
 ```
-
-And below is the visualisation generated by this simple feature test.
-
-![PhantomFlow Report: Feature test visualisation as tree Dendrogram](https://raw.githubusercontent.com/Huddle/PhantomFlow/master/tree-vis.png)
-
-### The visualisations
-
-Deciding how to visualise this data is the hard part.  It has to be readable and insightful. These visualisations are still evolving, it would be great to see contributions for better visualisations. Visit [d3js.org](http://d3js.org/) for inspiration.
-
-### PhantomFlow methods
-
-* flow (string, callback) : initialise a test suite with a name, and a function that contains Steps, Chances and Decisions
-* step (string, callback) : a discrete step, with a name and a callback that can contain a PhantomCSS screenshot as well as CasperJS events and asserts.
-* decision (object) : Defines a user decision.  It takes an object with key value pairs, where the key is the label for a particular decision, and the value is the function to be executed.  The function can contains further decisions, chances and steps
-* chance (object) : The same as a decision but offers the semantic representation of a chance event, as opposed to a deliberate possible action by the user
-
-### NodeJS setup example
-
-```javascript
-	var flow = require('../phantomflow').init({
-		// debug: 2
-		// createReport: true,
-		// test: 'coffee'
-	});
-
-	// flow.report(); // Show report
-
-	flow.run(function(code){
-		process.exit(code); // callback is executed when PhantomFlow is complete
-	});	
-
-```
-
-### NodeJs Methods
-
-* run (callback) : Runs all the tests.  Takes a callback which is executed when complete
-* report () : Spins up a local connect server and loads a browser window with the visualisation generated on the last test run.
 
 ### Options
 
-* createReport (boolean) : Should a report/visualisation be built?
-* casperArgs (string[]): optional arguments to pass into casper and PhantomJS, such as `--ignore-ssl-errors=true`
 * debug (number) : A value of 1 will output more logging, 2 will generate full page screenshots per test which can be found in the test-results folder.  Forces tests onto one thread for readability.
-* earlyexit (boolean) : False by default, if set to true all tests will abort on the first failure
-* hideElements (string[]) : array of element names that should be invisible in the final page, and in screenshots
-* includes (string) : Defaults to 'include', it is the root directory of custom global includes (within the PhantomJS domain)
-* port (number) : Defaults to 9001, this is the port that will be used to show the report/visualisation
-* results (string) : Defaults to 'test-results', it is the root directory of the test results
-* reports (string) : Defaults to {results} + '/report/', it is the root directory of generated reports, useful for proxying the reports
 * remoteDebug (boolean) : Enable PhantomJS remote debugging
-* remoteDebugAutoStart (boolean) : Enable autostart for PhantomJS remote debugging
-* remoteDebugPort (number) : Defaults to 9000, the port on which Web Inspector will run
-* skipVisualTests (boolean) : If set to true the visual comparison step will not be run
 * test (string) : Test run filtering with a substring match
-* tests (string) : Defaults to 'test', it is the root directory of your tests 
-* threads (number) : How many processes do you think you can parallelise your tests on.  Defaults to 4.
+* report : bring up test report (after test complete)
+* retry (number) : max retry time for failed test to reduce unreliability caused by render engine or external factor
+* setting (string) : assign a setting file to set test endpoint, account, etc for test cases
 
 ### Parallelisation
 
@@ -144,42 +105,17 @@ Test execution is parallelised for increased speed and a reduced test to dev fee
 
 ### Debugging
 
-Debugging is often a painful part of writing tests with PhantomJS.  If you're experiencing trouble try the following.
+Debugging is often a painful part of writing tests with PhantomJS.  If you're experiencing trouble try the following:
+node test.js debug
 
-* Enable debug mode 1, to show more logging.  This will also prevent parallelisation - better for readability, but slower.
-```javascript
-	var flow = require('../phantomflow').init({
-		debug: 1
-	});
-```
+* PhantomJS provides [remote debugging](https://github.com/ariya/phantomjs/wiki/Troubleshooting#remote-debugging) functionality.  This setting allows you to use the debugger; statement and add breakpoints with the [Web Inspector interface](https://www.webkit.org/blog/1620/webkit-remote-debugging/).  
 
-* Enable debug mode 2, same as mode 1 but will also generate full-page screenshots per step, to allow to see what's actualy going on.
-```javascript
-	var flow = require('../phantomflow').init({
-		debug: 2
-	});
-```
-
-* PhantomJS provides [remote debugging](https://github.com/ariya/phantomjs/wiki/Troubleshooting#remote-debugging) functionality.  This setting allows you to use the debugger; statement and add breakpoints with the [Web Inspector interface](https://www.webkit.org/blog/1620/webkit-remote-debugging/).  Remote debugging can be use in conjunction with the debug modes described above.
-
-```javascript
-	var flow = require('../phantomflow').init({
-		remoteDebug: true
-		// remoteDebugAutoStart: false
-		// remoteDebugPort: 9000
-	});
-```
+node test.js remoteDebug
 
 ### Rebasing visual tests
 
 Rebasing is the process of deleting an original visual test, and creating a new baseline, either by renaming the diff image, or running the test suite again to create a new image.  The PhantomFlow UI provides a quick way to find and inspect differences, with a 'rebase' button to accept the latest image as the baseline.
 
-![PhantomFlow UI: Rebase button](https://raw.githubusercontent.com/Huddle/PhantomFlow/master/rebase-vis.png)
-
-### What next?
-
-We've been using this testing style for many months on Huddle's biggest UI application. It's still an evolving idea but for those of us that actively worked on it, it's making a huge difference to the way we think about UI, and how we communicate about UI. It supports TDD well, we use it for 'unit' testing UI but it has great potential for end-to-end as well. I'd also like to do more work on the visualisations, they look great and are very communicable, but they could be a better.  Of course, this is an Open Source project and it would be great to see contributions.
-
 --------------------------------------
 
-Created by [James Cryer](http://github.com/jamescryer) and the Huddle development team.
+Forked from [Huddle/PhantomFlow](https://github.com/Huddle/PhantomFlow) by [James Cryer](http://github.com/jamescryer) and the Huddle development team.
