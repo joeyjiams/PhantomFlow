@@ -21,13 +21,16 @@ PhantomFlow
 
 ### Install
 
-* Install with git `git clone https://github.com/Joeyjiams/PhantomFlow.git` `cd phantomflow` `npm install`
+* Install with git 
+`git clone https://github.com/joeyjiams/PhantomFlow.git` 
+`cd phantomflow` 
+`npm install`
 
 ### Try it!
 
-* `node test/test.js` - First run will create visual test baslines with PhantomCSS
-* `node test/test.js` - Second run will compare baseline visuals with the latest screenshots. This'll pass because there have been no changes.
-* `node test/test.js report` - An optional step to load the Decision tree visualisation into your Web browser
+* `node test.js` - First run will create visual test baslines with PhantomCSS
+* `node test.js` - Second run will compare baseline visuals with the latest screenshots. This'll pass because there have been no changes.
+* `node test.js report` - An optional step to load the Decision tree visualisation into your Web browser
 
 There is an example test suites in test folder. You can add yours there too and they got run in parallel.
 
