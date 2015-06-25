@@ -6,6 +6,8 @@ var filterTest;
 var debugMode;
 var remoteDebug;
 var maxRetry;
+var tests;
+var results;
 var setting = 'testSetting.json';
 
 process.argv.forEach(function(arg, i){
@@ -27,6 +29,12 @@ process.argv.forEach(function(arg, i){
 	if (/^setting=/.test(arg)) {
 	    setting = arg.split('=')[1];
 	}
+	if (/^tests=/.test(arg)) {
+	    tests = arg.split('=')[1];
+	}
+	if (/^results=/.test(arg)) {
+	    results = arg.split('=')[1];
+	}
 });
 
 var phantomflowPathFile = './phantomflow.js';
@@ -39,7 +47,9 @@ var flow = require(phantomflowPathFile).init({
     remoteDebug: remoteDebug,
     casperArgs: '--ssl-protocol=any --web-security=false  --ignore-ssl-errors=yes',
     retry: maxRetry,
-    setting: setting
+    setting: setting,
+    tests: tests,
+    results: results
 });
 
 if(showReport){
