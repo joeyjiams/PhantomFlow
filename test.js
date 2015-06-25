@@ -48,8 +48,8 @@ var flow = require(phantomflowPathFile).init({
     casperArgs: '--ssl-protocol=any --web-security=false  --ignore-ssl-errors=yes',
     retry: maxRetry,
     setting: setting,
-    tests: tests,
-    results: results
+    tests: tests, // specify a folder containing test files
+    results: results // specify a folder to place results from test runs
 });
 
 if(showReport){
