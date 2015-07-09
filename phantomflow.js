@@ -45,8 +45,8 @@ module.exports.init = function ( options ) {
 	var remoteDebugAutoStart = options.remoteDebugAutoStart || false;
 	var remoteDebugPort = options.remoteDebugPort || 9000;
 
-	var threads = options.threads || 4;
-	var maxRetry = typeof(options.retry) == "undefined" ? 3 : options.retry;
+	var threads = options.threads || 8;
+	var maxRetry = typeof(options.retry) == "undefined" ? 2 : options.retry;
 
     /*
 		Set to false if you do not want the tests to return on the first failure
