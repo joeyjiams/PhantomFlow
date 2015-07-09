@@ -101,6 +101,8 @@ The [demo](http://github.com/joeyjiams/PhantomFlow/tree/master/test/example.test
 * report : bring up test report (after test complete)
 * retry (number) : max retry time for failed test to reduce unreliability caused by render engine or external factor
 * setting (string) : assign a setting file to set test endpoint, account, etc for test cases
+* results (string) : assign a directory to place the results of the tests
+* tests (string) : specify a directory containing the test files you wish to run
 
 ### Parallelisation
 
