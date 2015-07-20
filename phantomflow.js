@@ -488,7 +488,8 @@ function writeStaticTestReport(dir, data) {
         'for(var i = 0; i < screenshots.length; i++) {' +
         'screenshots[i].className = screenshots[i].clientHeight > 500 ? "sbs" : "topdown";' +
         '}}' +
-        'window.onload=setview;' +
+        'setTimeout(setview, 6000);' +
+        'window.onload=function(){setTimeout(setview, 3000)};' +
         '</script>';
     var html = '<!DOCTYPE html>'
         + '<html><head>' + header + style + script + '</head><body onload="setview();">' + body + '</body></html>';
