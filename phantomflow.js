@@ -187,7 +187,6 @@ module.exports.init = function (options) {
             cleanupFolderRecursive(results, true);
             deleteFile('failedtests.json', true);
             testFiles(files);
-
             eventEmitter.on('retry', function () {
                 console.log("Retry run #" + (++retry));
                 cleanupFolderRecursive(results, false);
@@ -477,7 +476,7 @@ function writeStaticTestReport(dir, data) {
     } else {
         body = '<h1 class="passed">All test passed.</h1>';
     }
-    var style = '<style>body{font-family: wf_segoe-ui_normal,Segoe,Tahoma,Verdana,Arial,sans-serif;} h2 {font-size: 1em;}.failed {color:red;} .passed {color:green;} h3 {color:gray} .latest, .diff{border: 1px dashed lightcoral;} .origin{border: 1px dashed lightgreen;} .origin, .latest {cursor:pointer;} .owner,.testurl{color:darkcyan;} .owner {background-color:yellow} h2 span{margin-right: 1em;} .anchor{margin-left: 15px;} #back{position:fixed;top:0;right:0;border:1px solid gray;padding:10px;background-color: lightyellow;text-decoration: none;}.sbs{overflow-x: scroll;white-space: nowrap;}.sbs>div{display:inline-block;vertical-align:top;}</style>';
+    var style = '<style>body{font-family: wf_segoe-ui_normal,Segoe,Tahoma,Verdana,Arial,sans-serif;} h2 {font-size: 1em;}.failed {color:red;} .passed {color:green;} h3 {color:gray} .latest, .diff{border: 1px dashed lightcoral;} .origin{border: 1px dashed lightgreen;margin-right:10px;} .origin, .latest {cursor:pointer;} .owner,.testurl{color:darkcyan;} .owner {background-color:yellow} h2 span{margin-right: 1em;} .anchor{margin-left: 15px;} #back{position:fixed;top:0;right:0;border:1px solid gray;padding:10px;background-color: lightyellow;text-decoration: none;}.sbs{overflow-x: auto;white-space: nowrap;}.sbs>div{display:inline-block;vertical-align:top;}</style>';
     var script = '<script type="text/javascript">function sidebyside(id) {' +
             'document.getElementById(id).className="sbs";' +
         '} ' +
@@ -485,11 +484,14 @@ function writeStaticTestReport(dir, data) {
             'document.getElementById(id).className="topdown";' +
         '} ' +
         'function setview() {' +
-        '' +
-        '}' +
+        'var screenshots = document.getElementsByClassName("screenshot");' +
+        'for(var i = 0; i < screenshots.length; i++) {' +
+        'screenshots[i].className = screenshots[i].clientHeight > 500 ? "sbs" : "topdown";' +
+        '}}' +
+        'window.onload=setview;' +
         '</script>';
     var html = '<!DOCTYPE html>'
-        + '<html><head>' + header + style + script + '</head><body>' + body + '</body></html>';
+        + '<html><head>' + header + style + script + '</head><body onload="setview();">' + body + '</body></html>';
     fs.writeFileSync(filename, html);
 }
 
@@ -516,8 +518,8 @@ function pickOutFailedTests(data, name, output) {
 
                     output.summary += titleForSummary + desc;
                     output.val += title + desc
-                        + '<form><input type="radio" name="compare" onclick="sidebyside(\'' + id + 'img\');" checked>Compare side by side</input> <input type="radio" name="compare" onclick="topdown(\'' + id + 'img\');">Compare top to down</input></form>'
-                        + '<div id="' + id + 'img" class="sbs" ><div id="' + id + 'base"><h3>Baseline</h3>'
+                        + '<button onclick="sidebyside(\'' + id + 'img\');" >Compare side by side</button> <button onclick="topdown(\'' + id + 'img\');">Compare top to down</button>'
+                        + '<div id="' + id + 'img" class="screenshot" ><div id="' + id + 'base"><h3>Baseline</h3>'
                         + '<img class="origin" src="' + screenshot.original + '" onclick="window.open(this.src);"/></div>'
                         + '<div id="' + id + 'new" "><h3>Latest</h3>'
                         + '<img class="latest" src="' + screenshot.latest + '" onclick="window.open(this.src);"/></div></div>'
