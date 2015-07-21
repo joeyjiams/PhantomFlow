@@ -462,7 +462,9 @@ function copyReportTemplate(data, dir, templateName) {
         fs.writeFileSync(datafilename, data);
     }
 
-    writeStaticTestReport(dir, JSON.parse(data));
+	var json = JSON.parse(data);
+    writeStaticTestReport(dir, json);
+	writeTrx(dir, json);
 }
 
 function writeStaticTestReport(dir, data) {
@@ -536,6 +538,53 @@ function pickOutFailedTests(data, name, output) {
         }
         if (data.hasOwnProperty('children') && data.children) {
             pickOutFailedTests(data.children, testname, output);
+        }
+    }
+}
+
+function writeTrx(dir, data) {
+    var filename = path.join(dir, 'TestResult.trx');
+    var failedTest = { testdef: '', result: ''};
+    pickOutFailedTestsForXml(data, 'Test', failedTest);
+    var xml = '<?xml version="1.0" encoding="UTF-8"?><TestRun id="914724db-30eb-4967-8155-fdb55bbd4b85"><TestDefinitions>'
+        + failedTest.testdef + '</TestDefinitions><Results>' + failedTest.result + '</Results></TestRun>';
+    fs.writeFileSync(filename, xml);
+}
+
+function pickOutFailedTestsForXml(data, name, output) {
+	if (typeof data == 'object' && data) {
+		console.log('pickOutFailedTestsForXml'+name);
+        var testname = '';
+        if (data.hasOwnProperty('name')) {
+            testname = name + ' > ' + data.name;
+        } else {
+            for (var child in data) {
+                pickOutFailedTestsForXml(data[child], Array.isArray(data) ? name : child, output);
+            }
+        }
+
+        if (data.hasOwnProperty('screenshot')) {
+			var screenshot = data.screenshot;
+            var id = testname.replace(/\W|_/g, '');
+			console.log('found one screenshot:'+id);
+            var errorMsg = 'Failed to capture screenshot. Dead link? Bad selector? See instruction in http://aka.ms/uiregression';
+			var status = 'Failed';
+            if (screenshot) {
+				if (screenshot.hasOwnProperty('failure')) {
+                    errorMsg = 'Screen shot changed. See instruction in http://aka.ms/uiregression';
+				}
+				else {
+					status = 'Passed';
+					errorMsg = '';
+				}
+            }
+			output.testdef += '<UnitTest name="' + testname + '" priority="1" id="' + id + '"><Owners><Owner name="'+ data.owner +'" /></Owners></UnitTest>';
+			output.result += '<UnitTestResult testId="' + id + '" testName="' + testname + '" computerName="" outcome="' + status + '" ><Output><ErrorInfo><Message>' + errorMsg + '</Message></ErrorInfo></Output></UnitTestResult>';
+			console.log('output.testdef:'+output.testdef);
+			console.log('output.result:'+output.result);
+        }
+        if (data.hasOwnProperty('children') && data.children) {
+            pickOutFailedTestsForXml(data.children, testname, output);
         }
     }
 }
