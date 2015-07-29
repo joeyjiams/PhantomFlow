@@ -23,12 +23,15 @@ var execSync = require('child_process').execSync;
 
 var optionDebug;
 
+var startTime = (new Date).toISOString();
+
+var finishTime;
+
 module.exports = {};
 
 module.exports.init = function (options) {
 
     var time = Date.now();
-
     var filterTests = options.test;
 
     var bootstrapPath = path.join(__dirname, 'lib');
@@ -217,8 +220,9 @@ module.exports.init = function (options) {
             });
 
             eventEmitter.on('report', function () {
+				finishTime = (new Date).toISOString();
                 mergedData = concatData(dataPath, visualTestsPath, visualResultsPath);
-
+				
                 copyReportTemplate(
                     mergedData,
                     reportPath,
@@ -577,7 +581,9 @@ function pickOutFailedTestsForXml(data, name, output) {
                 }
             }
             output.testdef += '<UnitTest name="' + testname + '" priority="1" id="' + id + '"><Owners><Owner name="' + data.owner + '" /></Owners></UnitTest>';
-            output.result += '<UnitTestResult testId="' + id + '" testName="' + testname + '" computerName="" outcome="' + status + '" ><Output><ErrorInfo><Message>' + errorMsg + '</Message></ErrorInfo></Output></UnitTestResult>';
+            output.result += '<UnitTestResult testId="' + id + '" testName="' + testname + '" computerName="" outcome="' + status + '"' 
+				+ ((output.result == '') ?  ' startTime="' + startTime + '" endTime="' + finishTime + '"' : '')
+				+ ' ><Output><ErrorInfo><Message>' + errorMsg + '</Message></ErrorInfo></Output></UnitTestResult>';
         }
         if (data.hasOwnProperty('children') && data.children) {
             pickOutFailedTestsForXml(data.children, testname, output);
