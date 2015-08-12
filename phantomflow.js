@@ -548,10 +548,10 @@ function pickOutFailedTests(data, name, output) {
 
 function writeTrx(dir, data) {
     var filename = path.join(dir, 'TestResult.trx');
-    var failedTest = { testdef: '', result: '' };
+    var failedTest = { testdef: '', testentry: '', result: '' };
     pickOutFailedTestsForXml(data, 'Test', failedTest);
     var xml = '<?xml version="1.0" encoding="UTF-8"?><TestRun id="914724db-30eb-4967-8155-fdb55bbd4b85"><TestDefinitions>'
-        + failedTest.testdef + '</TestDefinitions><Results>' + failedTest.result + '</Results></TestRun>';
+        + failedTest.testdef + '</TestDefinitions><TestEntries>' + failedTest.testentry + '</TestEntries><Results>' + failedTest.result + '</Results></TestRun>';
     fs.writeFileSync(filename, xml);
 }
 
@@ -581,7 +581,8 @@ function pickOutFailedTestsForXml(data, name, output) {
                 }
             }
             output.testdef += '<UnitTest name="' + testname + '" priority="1" id="' + id + '"><Owners><Owner name="' + data.owner + '" /></Owners></UnitTest>';
-            output.result += '<UnitTestResult testId="' + id + '" testName="' + testname + '" computerName="" outcome="' + status + '"' 
+            output.testentry += '<TestEntry testId="' + id + '" executionId="' + id + '" />';
+            output.result += '<UnitTestResult testId="' + id + '" executionId="'+ id +'" testName="' + testname + '" computerName="" outcome="' + status + '"' 
 				+ ((output.result == '') ?  ' startTime="' + startTime + '" endTime="' + finishTime + '"' : '')
 				+ ' ><Output><ErrorInfo><Message>' + errorMsg + '</Message></ErrorInfo></Output></UnitTestResult>';
         }
