@@ -550,7 +550,7 @@ function writeTrx(dir, data) {
     var filename = path.join(dir, 'TestResult.trx');
     var failedTest = { testdef: '', testentry: '', result: '' };
     pickOutFailedTestsForXml(data, 'Test', failedTest);
-    var xml = '<?xml version="1.0" encoding="UTF-8"?><TestRun id="914724db-30eb-4967-8155-fdb55bbd4b85"><TestDefinitions>'
+    var xml = '<?xml version="1.0" encoding="UTF-8"?><TestRun id="914724db-30eb-4967-8155-fdb55bbd4b85"><Times start="' + startTime + '" finish="' + finishTime +'" /><TestDefinitions>'
         + failedTest.testdef + '</TestDefinitions><TestEntries>' + failedTest.testentry + '</TestEntries><Results>' + failedTest.result + '</Results></TestRun>';
     fs.writeFileSync(filename, xml);
 }
