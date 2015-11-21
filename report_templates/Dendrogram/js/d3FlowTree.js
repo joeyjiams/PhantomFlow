@@ -12,7 +12,8 @@ function createD3Tree(root, config){
 	var fileRoot = config.root || '';
 
 	var width = $(window).width();
-	var height = $(window).height();
+	var nodeHeight = getStepCount(root) * 25;
+	var height = Math.max($(window).height(), nodeHeight);
 	var cluster = d3.layout.cluster().size([height , width - 220]);
 	var diagonal = d3.svg.diagonal().projection(function(d) { return [d.y, d.x]; });
 
@@ -137,4 +138,17 @@ function createD3Tree(root, config){
 	zoom.scale(1);
 	zoom.translate([50, 50]);
 	zoom.event(svg);
+}
+
+function getStepCount(node) {
+    if(node.isStep) {
+        return 1;
+    }
+
+    var count = 0;
+    for(var i = 0;i < node.children.length; i++) {
+        count += getStepCount(node.children[i]);
+    }
+
+    return count;
 }
