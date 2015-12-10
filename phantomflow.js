@@ -602,7 +602,7 @@ function getImageResultFailureFromSrc(src) {
 
 function dataTransform(key, value, imagePath, imageResultPath) {
     var obj, ori, latest, fail, img;
-    if (key === 'screenshot') {
+    if (key === 'screenshot' && value) {
 
         img = changeSlashes(value);
         ori = path.join(imageResultPath, img);
