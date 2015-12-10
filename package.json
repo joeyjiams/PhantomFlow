@@ -10,7 +10,7 @@
     "bl": "^0.9.4",
     "colors": "^0.6.2",
     "brace-expansion": "^1.1.0",
-    "datauri": "^0.5.5",
+    "datauri": "^0.8.0",
     "inflight": "^1.0.4",
     "connect": "^2.14.5",
     "async": "^0.8.0",
