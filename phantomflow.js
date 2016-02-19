@@ -20,6 +20,7 @@ var cp = require('child_process');
 var wrench = require('wrench');
 var async = require('async');
 var execSync = require('child_process').execSync;
+var guid = require('guid');
 
 var optionDebug;
 
@@ -550,8 +551,8 @@ function writeTrx(dir, data) {
     var filename = path.join(dir, 'TestResult.trx');
     var failedTest = { testdef: '', testentry: '', result: '' };
     pickOutFailedTestsForXml(data, 'Test', failedTest);
-    var xml = '<?xml version="1.0" encoding="UTF-8"?><TestRun id="914724db-30eb-4967-8155-fdb55bbd4b85"><Times start="' + startTime + '" finish="' + finishTime +'" /><TestDefinitions>'
-        + failedTest.testdef + '</TestDefinitions><TestEntries>' + failedTest.testentry + '</TestEntries><Results>' + failedTest.result + '</Results></TestRun>';
+    var xml = '<?xml version="1.0" encoding="UTF-8"?><TestRun id="914724db-30eb-4967-8155-fdb55bbd4b85" name="Ui Regression Test" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010" ><Times creation="' + startTime + '" start="' + startTime + '" finish="' + finishTime + '" /><TestDefinitions>'
+        + failedTest.testdef + '</TestDefinitions><TestEntries>' + failedTest.testentry + '</TestEntries><TestLists><TestList name="Results Not in a List" id="19431567-8539-422a-85d7-44ee4e166bda" /></TestLists><Results>' + failedTest.result + '</Results></TestRun>';
     fs.writeFileSync(filename, xml);
 }
 
@@ -568,21 +569,21 @@ function pickOutFailedTestsForXml(data, name, output) {
 
         if (data.hasOwnProperty('screenshot')) {
             var screenshot = data.screenshot;
-            var id = testname.replace(/\W|_/g, '');
-            var errorMsg = 'Failed to capture screenshot. Dead link? Bad selector? See instruction in http://aka.ms/uiregression';
+            var id = guid.raw();
+            var errorMsg = '<![CDATA[Failed to capture screenshot. Dead link? Bad selector? See instruction in http://aka.ms/uiregression. \r\nTest Url: ' + data.testUrl + ']]>';
             var status = 'Failed';
             if (screenshot) {
                 if (screenshot.hasOwnProperty('failure')) {
-                    errorMsg = 'Screen shot changed. See instruction in http://aka.ms/uiregression';
+                    errorMsg = '<![CDATA[Screen shot changed. See instruction in http://aka.ms/uiregression. \r\nTest Url: ' + data.testUrl + ']]>';
                 }
                 else {
                     status = 'Passed';
                     errorMsg = '';
                 }
             }
-            output.testdef += '<UnitTest name="' + testname + '" priority="1" id="' + id + '"><Owners><Owner name="' + data.owner + '" /></Owners></UnitTest>';
-            output.testentry += '<TestEntry testId="' + id + '" executionId="' + id + '" />';
-            output.result += '<UnitTestResult testId="' + id + '" executionId="'+ id +'" testName="' + testname + '" computerName="" outcome="' + status + '"' 
+            output.testdef += '<UnitTest name="' + testname + '" priority="1" id="' + id + '"><Owners><Owner name="' + data.owner + '" /></Owners><TestMethod codeBase="" className="" name="' + testname + '" /></UnitTest>';
+            output.testentry += '<TestEntry testId="' + id + '" testListId="19431567-8539-422a-85d7-44ee4e166bda" executionId="' + id + '" />';
+            output.result += '<UnitTestResult testId="' + id + '" executionId="' + id + '" testName="' + testname + '" testListId="19431567-8539-422a-85d7-44ee4e166bda" computerName="" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="' + status + '"'
 				+ ((output.result == '') ?  ' startTime="' + startTime + '" endTime="' + finishTime + '"' : '')
 				+ ' ><Output><ErrorInfo><Message>' + errorMsg + '</Message></ErrorInfo></Output></UnitTestResult>';
         }
@@ -778,7 +779,7 @@ function getCasperPath() {
     var nodeModules = path.resolve(__dirname, 'node_modules', 'phantomcss', 'node_modules');
     var phantomjs = require(path.resolve(nodeModules, 'phantomjs'));
     var isWindows = /^win/.test(process.platform);
-    var casperPath = nodeModules + "/casperjs/bin/casperjs" + (isWindows ? ".exe" : "");
+    var casperPath = path.resolve(__dirname, 'node_modules') + "/casperjs/bin/casperjs" + (isWindows ? ".exe" : "");
 
     if (fs.existsSync(phantomjs.path)) {
         process.env["PHANTOMJS_EXECUTABLE"] = phantomjs.path;
