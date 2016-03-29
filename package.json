@@ -20,10 +20,9 @@
     "inherits": "^2.0.1",
     "lodash": "^2.4.2",
     "open": "^0.0.4",
-    "phantomcss": "^0.10.1",
+    "phantomcss": "^1.0.0",
     "wrench": "^1.5.8",
     "request": "~2.67.0",
-    "casperjs": "1.1.0-beta4",
     "guid": "^0.0.12"
   },
   "devDependencies": {},

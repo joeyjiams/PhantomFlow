@@ -776,20 +776,62 @@ function deleteFile(file, isDelete) {
 }
 
 function getCasperPath() {
-    var nodeModules = path.resolve(__dirname, 'node_modules', 'phantomcss', 'node_modules');
-    var phantomjs = require(path.resolve(nodeModules, 'phantomjs'));
-    var isWindows = /^win/.test(process.platform);
-    var casperPath = path.resolve(__dirname, 'node_modules') + "/casperjs/bin/casperjs" + (isWindows ? ".exe" : "");
+	var nodeModules = path.resolve( __dirname, 'node_modules', 'phantomcss', 'node_modules' );
+	var isWindows = /^win/.test( process.platform );
+	var casperEndPath = path.join('casperjs', 'bin', 'casperjs' + ( isWindows? ".exe" : "" ));
+	var casperPath;
 
-    if (fs.existsSync(phantomjs.path)) {
-        process.env["PHANTOMJS_EXECUTABLE"] = phantomjs.path;
-    } else {
-        console.log("PhantomJS is not installed? Try `npm install`".bold.red);
-    }
+	var phantomIsRelative = resolvePhantomJS(nodeModules);
 
-    if (!fs.existsSync(casperPath)) {
-        console.log("CasperJS is not installed? Try `npm install`".bold.red);
-    }
+	try {
+		casperPath =  require.resolve( casperEndPath );
+	} catch (e) {
 
-    return casperPath;
+		if(phantomIsRelative){
+			casperPath = path.resolve( __dirname, '..', casperEndPath);
+		} else {
+			casperPath = path.resolve( nodeModules, casperEndPath);
+		}
+
+		try {
+			stats = fs.lstatSync(casperPath);
+		}
+		catch (e) {
+			casperPath = path.resolve( __dirname, 'node_modules', casperEndPath);
+		}
+	}
+
+	if ( !fs.existsSync( casperPath ) ) {
+		log( "CasperJS is not installed? Try `npm install`".bold.red );
+	}
+
+	return casperPath;
+}
+
+function resolvePhantomJS(nodeModules){
+	var phantomjsPath;
+
+	try {
+		phantomjsPath = require.resolve('phantomjs-prebuilt' );
+
+	} catch(e){
+		phantomjsPath = path.resolve( nodeModules, 'phantomjs-prebuilt' );
+		try {
+			fs.lstatSync(phantomjsPath);
+		}
+		catch (e) {
+			phantomjsPath = 'phantomjs-prebuilt';
+			return true; // is relative path
+		}
+	}
+
+	var phantom = require(phantomjsPath);
+
+	if ( fs.existsSync( phantom.path ) ) {
+		process.env[ "PHANTOMJS_EXECUTABLE" ] = phantom.path;
+	} else {
+		log( "PhantomJS is not installed? Try `npm install`".bold.red );
+	}
+
+	return false;
 }
